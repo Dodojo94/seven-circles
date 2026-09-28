@@ -1,44 +1,47 @@
 import * as THREE from 'three';
+import { FRAME_COUNT, IMP_SHEET_URL, QUAD_H, QUAD_W, headBandY } from './sheet';
 
-/**
- * Billboard sprite enemy placeholder.
- * Camera-facing colored plane (THREE.Sprite or quad); Mesh will replace art later.
- */
-export function createBillboardEnemy(): THREE.Object3D {
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    ctx.fillStyle = '#1a0000';
-    ctx.fillRect(0, 0, 128, 128);
-    ctx.fillStyle = '#cc2222';
-    ctx.beginPath();
-    ctx.ellipse(64, 72, 40, 48, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffee88';
-    ctx.beginPath();
-    ctx.arc(48, 56, 10, 0, Math.PI * 2);
-    ctx.arc(80, 56, 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#110000';
-    ctx.beginPath();
-    ctx.arc(48, 56, 4, 0, Math.PI * 2);
-    ctx.arc(80, 56, 4, 0, Math.PI * 2);
-    ctx.fill();
-  }
+const sheet = new THREE.TextureLoader().load(IMP_SHEET_URL);
+sheet.magFilter = THREE.NearestFilter;
+sheet.minFilter = THREE.NearestFilter;
+sheet.generateMipmaps = false;
+sheet.colorSpace = THREE.SRGBColorSpace;
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-
-  const material = new THREE.SpriteMaterial({
-    map: texture,
+/** Yaw-only imp quad. Feet sit at the bottom of the plane (center origin). */
+export function createBillboardEnemy(): THREE.Mesh {
+  const geometry = new THREE.PlaneGeometry(QUAD_W, QUAD_H);
+  const material = new THREE.MeshBasicMaterial({
+    map: sheet,
     transparent: true,
-    depthWrite: true,
+    alphaTest: 0.4,
+    side: THREE.DoubleSide,
   });
-  const sprite = new THREE.Sprite(material);
-  sprite.scale.set(2.2, 2.2, 1);
-  sprite.name = 'enemy-billboard-placeholder';
-  return sprite;
+  const quad = new THREE.Mesh(geometry, material);
+  quad.name = 'imp-billboard';
+  setImpFrame(quad, 0);
+  return quad;
+}
+
+/** L→R frame on the shared sheet. Each mesh keeps its own UVs. */
+export function setImpFrame(mesh: THREE.Mesh, frame: number): void {
+  const index = Math.max(0, Math.min(FRAME_COUNT - 1, frame));
+  const uv = mesh.geometry.getAttribute('uv');
+  const u0 = index / FRAME_COUNT;
+  const u1 = (index + 1) / FRAME_COUNT;
+  uv.setXY(0, u0, 1);
+  uv.setXY(1, u1, 1);
+  uv.setXY(2, u0, 0);
+  uv.setXY(3, u1, 0);
+  uv.needsUpdate = true;
+}
+
+export function isHeadHeight(mesh: THREE.Object3D, pointY: number): boolean {
+  return pointY >= headBandY(mesh.position.y, mesh.scale.y);
+}
+
+/** Yaw the quad so its face points at the camera. Stays upright (no pitch). */
+export function faceBillboard(billboard: THREE.Object3D, camera: THREE.Camera): void {
+  const dx = camera.position.x - billboard.position.x;
+  const dz = camera.position.z - billboard.position.z;
+  billboard.rotation.y = Math.atan2(dx, dz);
 }

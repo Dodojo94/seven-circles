@@ -1,23 +1,37 @@
-/** HUD: title + weapon slot labels. Lazy owns polish later. */
-export function initHud(): void {
-  const slots: Record<string, HTMLElement | null> = {
-    Digit1: document.getElementById('slot-primary'),
-    Digit2: document.getElementById('slot-secondary'),
-    Digit3: document.getElementById('slot-melee'),
+import type { WeaponSlot } from '../weapons/catalog';
+import type { HudModel } from '../weapons/loadout';
+
+const SLOT_IDS: Record<WeaponSlot, string> = {
+  primary: 'slot-primary',
+  secondary: 'slot-secondary',
+  melee: 'slot-melee',
+};
+
+/** Name + ammo + which slot is held. No damage, rate, or other base stats. */
+export function initHud(): { sync(model: HudModel): void } {
+  const slots = {} as Record<WeaponSlot, HTMLElement>;
+  for (const slot of Object.keys(SLOT_IDS) as WeaponSlot[]) {
+    const element = document.getElementById(SLOT_IDS[slot]);
+    if (!element) throw new Error(`#${SLOT_IDS[slot]} missing`);
+    slots[slot] = element;
+  }
+  const ammo = document.getElementById('hud-ammo');
+  if (!ammo) throw new Error('#hud-ammo missing');
+
+  const keys: Record<WeaponSlot, string> = {
+    primary: '1',
+    secondary: '2',
+    melee: '3',
   };
 
-  const highlight = (code: string): void => {
-    for (const [key, el] of Object.entries(slots)) {
-      if (!el) continue;
-      el.style.borderColor = key === code ? '#e8c070' : '#8b4513';
-      el.style.color = key === code ? '#fff0c0' : '#e8c070';
-    }
+  return {
+    sync(model: HudModel): void {
+      for (const slot of Object.keys(slots) as WeaponSlot[]) {
+        const element = slots[slot];
+        element.textContent = `[${keys[slot]}] ${model.names[slot]}`;
+        element.classList.toggle('active', slot === model.active);
+      }
+      ammo.textContent = model.ammo;
+    },
   };
-
-  // Default: Primary selected
-  highlight('Digit1');
-
-  window.addEventListener('weapon-slot', ((e: CustomEvent<string>) => {
-    highlight(e.detail);
-  }) as EventListener);
 }

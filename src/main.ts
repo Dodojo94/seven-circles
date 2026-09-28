@@ -4,11 +4,13 @@ import { createCombatFx } from './combat/fx';
 import { createSfx } from './combat/sfx';
 import { createEnemyWorld, type LiveEnemy } from './enemies/billboards/enemy';
 import { QUAD_H } from './enemies/billboards/sheet';
+import { IMP_SPAWNS, PLAYER_SPAWN } from './floors/layout';
 import { createArena } from './floors/arena';
 import { createWeaponPerks } from './perks/run';
 import { createFpsControls } from './player/fpsControls';
 import { initHud } from './ui/hud';
 import { initPerkHud } from './ui/perkHud';
+import { initMinimap } from './ui/minimap';
 import { initAimSettings } from './ui/settings';
 import { bindWeaponInput } from './weapons/input';
 import { Loadout } from './weapons/loadout';
@@ -18,10 +20,10 @@ if (!app) throw new Error('#app missing');
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0a0505);
-scene.fog = new THREE.FogExp2(0x1a0808, 0.045);
+scene.fog = new THREE.FogExp2(0x1a0808, 0.022);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
-camera.position.set(0, 1.6, 8);
+camera.position.set(PLAYER_SPAWN.x, 1.6, PLAYER_SPAWN.z);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -41,15 +43,19 @@ const ember = new THREE.PointLight(0xff6622, 0.7, 10, 2);
 ember.position.set(-2, 1.4, -1);
 scene.add(ember);
 
+const north = new THREE.PointLight(0xff6622, 1.15, 34, 2);
+north.position.set(0, 3.4, -30);
+scene.add(north);
+const west = new THREE.PointLight(0xff4400, 1, 32, 2);
+west.position.set(-26, 3.2, 10);
+scene.add(west);
+const east = new THREE.PointLight(0xaa2218, 0.95, 32, 2);
+east.position.set(26, 3.2, -4);
+scene.add(east);
+
 const arena = createArena(scene);
 const enemies = createEnemyWorld(scene);
-const spawns: Array<[number, number]> = [
-  [0, -4],
-  [-5, -8],
-  [5.5, -8],
-  [-8, 11],
-];
-for (const [x, z] of spawns) enemies.spawn(x, QUAD_H / 2, z);
+for (const [x, z] of IMP_SPAWNS) enemies.spawn(x, QUAD_H / 2, z);
 
 const sfx = createSfx();
 const controls = createFpsControls(camera, renderer.domElement, arena.colliders, {
@@ -61,6 +67,7 @@ const weaponInput = bindWeaponInput(renderer.domElement);
 const hud = initHud();
 const perks = createWeaponPerks();
 const perkHud = initPerkHud();
+const minimap = initMinimap();
 const fx = createCombatFx(scene, camera);
 const aim = new THREE.Vector3();
 const NEARBY_RANGE = 6;
@@ -201,6 +208,10 @@ function tick(): void {
   hud.sync(weapons.hud());
   syncPerks();
   perkHud.sync(perks.views(perkContext()));
+  minimap.sync(
+    { x: camera.position.x, z: camera.position.z, yaw: controls.yaw() },
+    enemies.alive().map((enemy) => ({ x: enemy.mesh.position.x, z: enemy.mesh.position.z })),
+  );
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }

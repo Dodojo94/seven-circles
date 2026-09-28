@@ -13,6 +13,8 @@ export interface FpsControls {
   setPerkMove(walkMul: number, dashCooldownMul: number): void;
   setInputEnabled(enabled: boolean): void;
   isMoving(): boolean;
+  /** Yaw in radians. 0 looks toward −Z (north on the minimap). */
+  yaw(): number;
 }
 
 export interface FpsControlOptions {
@@ -232,6 +234,9 @@ export function createFpsControls(
         keys.has('KeyS') ||
         keys.has('KeyD')
       );
+    },
+    yaw(): number {
+      return yaw;
     },
   };
 }

@@ -96,7 +96,7 @@
       #settings-panel[hidden] { display: none; }
       #settings-panel {
         position: absolute;
-        top: 52px;
+        top: 232px;
         right: 16px;
         width: 220px;
         padding: 12px;
@@ -108,6 +108,15 @@
       #settings-panel label { display: block; margin-bottom: 8px; }
       #settings-panel input[type="range"] { width: 100%; cursor: pointer; }
       #settings-note { margin-top: 8px; color: #a08060; font-size: 11px; }
+      #minimap {
+        position: absolute;
+        top: 52px;
+        right: 16px;
+        width: 168px;
+        height: 168px;
+        background: rgba(12, 5, 5, 0.88);
+        border: 1px solid #8b4513;
+      }
       #perk-list {
         position: absolute;
         top: 64px;
@@ -152,6 +161,7 @@
         </div>
         <div id="perk-list"></div>
         <div id="perk-toast" hidden></div>
+        <canvas id="minimap" width="168" height="168"></canvas>
         <button id="settings-gear" type="button">Aim</button>
         <div id="settings-panel" hidden>
           <label for="aim-sens">Aim sensitivity <span id="sens-readout">1.00</span></label>

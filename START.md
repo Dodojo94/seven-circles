@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (default `http://localhost:5173`). Click the game view to capture the mouse.
+Open the URL Vite prints (default `http://localhost:5173`). Click the game view to capture the mouse. **WASD** walk · **Space** jump · **Ctrl** or **C** crouch · **Shift** dash · **1 / 2 / 3** AK-47 / Desert Eagle / Knife · **LMB** fire · **R** reload. **Esc** releases the mouse and opens aim sensitivity. You cannot walk, dash, or shoot through the box walls. Dead billboards return after 5 seconds.
 
 ### Scripts
 
@@ -46,4 +46,4 @@ Local workspace for this seed: `/workspace/seven-circles` (box). On a laptop, an
 - [ ] HUD: “Seven Circles V0 — Floor 1”
 - [ ] Weapon labels: Primary / Secondary / Melee
 - [ ] One billboard enemy placeholder facing the camera
-- [ ] Walk / crouch / jump only (no slide/sprint)
+- [ ] Walk / crouch / jump / Shift dash (no slide, no sprint-hold)

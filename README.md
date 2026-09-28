@@ -13,7 +13,7 @@ npm run build    # tsc + vite build → dist/
 npm run preview  # serve production build
 ```
 
-Click the canvas for pointer lock. **WASD** walk · **Space** jump · **C** crouch · **1 / 2 / 3** weapon slots (Primary / Secondary / Melee). No sprint, no slide.
+Click the canvas for pointer lock. **WASD** walk (one speed) · **Space** jump · **Ctrl** or **C** crouch (slower, lower camera) · **1 / 2 / 3** highlight Primary / Secondary / Melee (no firing yet). No sprint, no slide. Walls and crates block movement.
 
 ## Stack
 

@@ -19,6 +19,10 @@ interface Gib {
 const gibGeometry = new THREE.BoxGeometry(0.16, 0.16, 0.16);
 const gibMaterial = new THREE.MeshBasicMaterial({ color: 0x9a1a12 });
 
+/** Wall-clock delay from the gib frame until the same spawn is alive again. */
+const RESPAWN_MS = 5000;
+const POP_TIME = 0.22;
+
 export interface EnemyWorld {
   alive(): LiveEnemy[];
   update(dt: number, camera: THREE.Camera): void;
@@ -29,6 +33,7 @@ class BillboardActor implements LiveEnemy {
   alive = true;
   private hp = ENEMY_HP;
   private flash = 0;
+  private pop = POP_TIME;
   private readonly material: THREE.MeshBasicMaterial;
 
   constructor(mesh: THREE.Mesh) {
@@ -38,6 +43,7 @@ class BillboardActor implements LiveEnemy {
       throw new Error('billboard material missing');
     }
     this.material = material;
+    mesh.scale.setScalar(0.2);
   }
 
   applyDamage(amount: number): void {
@@ -53,12 +59,36 @@ class BillboardActor implements LiveEnemy {
     this.flash -= dt;
     if (this.flash <= 0) this.material.color.setRGB(1, 1, 1);
   }
+
+  updatePop(dt: number): void {
+    if (this.pop <= 0) return;
+    this.pop -= dt;
+    const t = 1 - Math.max(this.pop, 0) / POP_TIME;
+    this.mesh.scale.setScalar(0.2 + 0.8 * t);
+  }
+
+  respawn(x: number, y: number, z: number): void {
+    this.hp = ENEMY_HP;
+    this.alive = true;
+    this.flash = 0;
+    this.pop = POP_TIME;
+    this.material.color.setRGB(1, 1, 1);
+    this.mesh.position.set(x, y, z);
+    this.mesh.scale.setScalar(0.2);
+  }
 }
 
 export function createEnemyWorld(scene: THREE.Scene): EnemyWorld & {
   spawn(x: number, y: number, z: number): void;
 } {
-  const actors: BillboardActor[] = [];
+  const slots: Array<{
+    actor: BillboardActor;
+    x: number;
+    y: number;
+    z: number;
+    /** 0 while alive. Set to now+5000ms on the gib frame. */
+    respawnAt: number;
+  }> = [];
   const gibs: Gib[] = [];
 
   function burst(origin: THREE.Vector3): void {
@@ -79,39 +109,36 @@ export function createEnemyWorld(scene: THREE.Scene): EnemyWorld & {
     }
   }
 
-  function disposeActor(actor: BillboardActor): void {
-    scene.remove(actor.mesh);
-    const material = actor.mesh.material;
-    if (!Array.isArray(material)) {
-      if (material instanceof THREE.MeshBasicMaterial) material.map?.dispose();
-      material.dispose();
-    }
-    actor.mesh.geometry.dispose();
-  }
-
   return {
     spawn(x: number, y: number, z: number): void {
       const mesh = createBillboardEnemy();
       mesh.position.set(x, y, z);
       scene.add(mesh);
-      actors.push(new BillboardActor(mesh));
+      slots.push({ actor: new BillboardActor(mesh), x, y, z, respawnAt: 0 });
     },
 
     alive(): LiveEnemy[] {
-      return actors.filter((actor) => actor.alive);
+      return slots.filter((slot) => slot.actor.alive).map((slot) => slot.actor);
     },
 
     update(dt: number, camera: THREE.Camera): void {
-      for (let i = actors.length - 1; i >= 0; i -= 1) {
-        const actor = actors[i];
-        if (!actor) continue;
+      const now = performance.now();
+      for (const slot of slots) {
+        const actor = slot.actor;
         if (!actor.alive) {
-          burst(actor.mesh.position);
-          disposeActor(actor);
-          actors.splice(i, 1);
+          if (slot.respawnAt === 0) {
+            burst(actor.mesh.position);
+            scene.remove(actor.mesh);
+            slot.respawnAt = now + RESPAWN_MS;
+          } else if (now >= slot.respawnAt) {
+            actor.respawn(slot.x, slot.y, slot.z);
+            scene.add(actor.mesh);
+            slot.respawnAt = 0;
+          }
           continue;
         }
         actor.updateFlash(dt);
+        actor.updatePop(dt);
         faceBillboard(actor.mesh, camera);
       }
 

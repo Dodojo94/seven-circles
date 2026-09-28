@@ -13,7 +13,7 @@ npm run build    # tsc + vite build → dist/
 npm run preview  # serve production build
 ```
 
-Click the canvas for pointer lock. **WASD** walk (one speed) · **Space** jump · **Ctrl** or **C** crouch · **1 / 2 / 3** swap AK-47 / Desert Eagle / Knife · **LMB** fire · **R** reload. Guns show ammo counts only — no damage or rate. Knife is infinite. **Esc** or the Aim button opens sensitivity (saved in the browser). No sprint, no slide. Walls block movement and shots.
+Click the canvas for pointer lock. **WASD** walk (one speed) · **Space** jump · **Ctrl** or **C** crouch · **Shift** dash (tap, look-relative, works in the air) · **1 / 2 / 3** swap AK-47 / Desert Eagle / Knife · **LMB** fire · **R** reload. Guns show ammo counts only — no damage or rate. Knife is infinite. **Esc** or the Aim button opens sensitivity (saved in the browser). No sprint-hold, no slide. Walls block movement and shots. Killed billboards respawn after 5 seconds.
 
 ## Stack
 

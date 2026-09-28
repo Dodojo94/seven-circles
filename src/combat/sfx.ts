@@ -8,6 +8,7 @@ export function createSfx(): {
   unlock(): void;
   fire(slot: WeaponSlot): void;
   reload(): void;
+  dash(): void;
 } {
   let ctx: AudioContext | null = null;
   let noise: AudioBuffer | null = null;
@@ -111,6 +112,13 @@ export function createSfx(): {
       if (!audio) return;
       tone(audio, 1400, 0.03, 'square', 0.035);
       tone(audio, 900, 0.04, 'square', 0.03, 0.06);
+    },
+
+    dash(): void {
+      const audio = context();
+      if (!audio) return;
+      burst(audio, 0.1, 480, 0.4, 0.1, 'lowpass');
+      tone(audio, 160, 0.09, 'sine', 0.05);
     },
   };
 }

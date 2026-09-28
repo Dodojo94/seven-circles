@@ -48,13 +48,15 @@ const spawns: Array<[number, number]> = [
 ];
 for (const [x, z] of spawns) enemies.spawn(x, 1.28, z);
 
-const controls = createFpsControls(camera, renderer.domElement, arena.colliders);
+const sfx = createSfx();
+const controls = createFpsControls(camera, renderer.domElement, arena.colliders, {
+  onDash: () => sfx.dash(),
+});
 initAimSettings(renderer.domElement, (scale) => controls.setLookScale(scale));
 const weapons = new Loadout();
 const weaponInput = bindWeaponInput(renderer.domElement);
 const hud = initHud();
 const fx = createCombatFx(scene, camera);
-const sfx = createSfx();
 const aim = new THREE.Vector3();
 
 renderer.domElement.addEventListener('pointerdown', () => sfx.unlock());

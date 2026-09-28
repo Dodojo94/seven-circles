@@ -9,6 +9,10 @@ export interface FpsControls {
   update(dt: number): void;
   /** Multiplier on mouse look. 1 is the default mid sensitivity. */
   setLookScale(scale: number): void;
+  /** Hidden perk scales. 1 leaves walk and dash cooldown unchanged. */
+  setPerkMove(walkMul: number, dashCooldownMul: number): void;
+  setInputEnabled(enabled: boolean): void;
+  isMoving(): boolean;
 }
 
 export interface FpsControlOptions {
@@ -47,6 +51,9 @@ export function createFpsControls(
   let dashTime = 0;
   let dashCooldown = 0;
   let fovKick = 0;
+  let walkMul = 1;
+  let dashCooldownMul = 1;
+  let inputEnabled = true;
 
   const euler = new THREE.Euler(0, 0, 0, 'YXZ');
   const forward = new THREE.Vector3();
@@ -57,7 +64,8 @@ export function createFpsControls(
   const dashDir = new THREE.Vector3();
 
   domElement.addEventListener('click', () => {
-    if (!pointerLocked) void domElement.requestPointerLock();
+    if (!inputEnabled || pointerLocked) return;
+    void domElement.requestPointerLock();
   });
 
   document.addEventListener('pointerlockchange', () => {
@@ -74,7 +82,7 @@ export function createFpsControls(
   });
 
   function tryDash(): void {
-    if (dashTime > 0 || dashCooldown > 0) return;
+    if (!inputEnabled || dashTime > 0 || dashCooldown > 0) return;
     euler.set(pitch, yaw, 0);
     camera.quaternion.setFromEuler(euler);
     camera.getWorldDirection(look);
@@ -123,9 +131,10 @@ export function createFpsControls(
 
   return {
     update(dt: number): void {
+      if (!inputEnabled) return;
       const crouched =
         keys.has('KeyC') || keys.has('ControlLeft') || keys.has('ControlRight');
-      const speed = crouched ? CROUCH_SPEED : WALK_SPEED;
+      const speed = (crouched ? CROUCH_SPEED : WALK_SPEED) * walkMul;
       const targetEye = crouched ? CROUCH_EYE : STAND_EYE;
       eye += (targetEye - eye) * Math.min(1, 12 * dt);
 
@@ -142,7 +151,7 @@ export function createFpsControls(
         if (dashTime <= 0) {
           dashTime = 0;
           velocityY = dashDir.y * 6;
-          dashCooldown = DASH_COOLDOWN;
+          dashCooldown = DASH_COOLDOWN * dashCooldownMul;
         }
       } else {
         dashCooldown = Math.max(0, dashCooldown - dt);
@@ -206,6 +215,23 @@ export function createFpsControls(
     },
     setLookScale(scale: number): void {
       lookScale = Number.isFinite(scale) ? Math.min(3, Math.max(0.15, scale)) : 1;
+    },
+    setPerkMove(nextWalk: number, nextDash: number): void {
+      walkMul = Number.isFinite(nextWalk) ? Math.min(1.5, Math.max(0.5, nextWalk)) : 1;
+      dashCooldownMul = Number.isFinite(nextDash) ? Math.min(1.5, Math.max(0.35, nextDash)) : 1;
+    },
+    setInputEnabled(enabled: boolean): void {
+      inputEnabled = enabled;
+      if (!enabled) keys.clear();
+    },
+    isMoving(): boolean {
+      return (
+        dashTime > 0 ||
+        keys.has('KeyW') ||
+        keys.has('KeyA') ||
+        keys.has('KeyS') ||
+        keys.has('KeyD')
+      );
     },
   };
 }

@@ -41,7 +41,9 @@ export class Loadout {
     this.names = names;
   }
 
-  tick(dt: number): void {
+  /** Advances cooldowns and reloads. True when a reload just finished. */
+  tick(dt: number): boolean {
+    let finished = false;
     for (const slot of SLOT_ORDER) {
       const weapon = this.weapons[slot];
       weapon.cooldown = Math.max(0, weapon.cooldown - dt);
@@ -53,7 +55,9 @@ export class Loadout {
       const take = Math.min(need, weapon.reserve);
       weapon.mag += take;
       weapon.reserve -= take;
+      finished = true;
     }
+    return finished;
   }
 
   swap(slot: WeaponSlot): void {
@@ -62,14 +66,14 @@ export class Loadout {
     this.active = slot;
   }
 
-  /** Starts a reload. False when melee, already reloading, full, or no reserve. */
-  requestReload(): boolean {
+  /** Starts a reload. `reloadMul` scales the hidden duration. */
+  requestReload(reloadMul = 1): boolean {
     const weapon = this.weapons[this.active];
     if (weapon.arch.fire === 'melee') return false;
     if (weapon.reloading > 0) return false;
     if (weapon.reserve <= 0) return false;
     if (weapon.mag >= weapon.arch.magSize) return false;
-    weapon.reloading = weapon.arch.reload;
+    weapon.reloading = weapon.arch.reload * Math.max(0.25, reloadMul);
     return true;
   }
 
@@ -77,7 +81,7 @@ export class Loadout {
    * Consume a trigger pull. `held` is for full-auto; `edge` is a fresh click
    * for the pistol and knife. Returns the hidden archetype when a shot fires.
    */
-  pull(held: boolean, edge: boolean): WeaponArchetype | null {
+  pull(held: boolean, edge: boolean, intervalMul = 1): WeaponArchetype | null {
     const weapon = this.weapons[this.active];
     if (weapon.reloading > 0 || weapon.cooldown > 0) return null;
     const trigger = weapon.arch.fire === 'auto' ? held : edge;
@@ -86,8 +90,19 @@ export class Loadout {
       if (weapon.mag <= 0) return null;
       weapon.mag -= 1;
     }
-    weapon.cooldown = weapon.arch.interval;
+    weapon.cooldown = weapon.arch.interval * Math.max(0.25, intervalMul);
     return weapon.arch;
+  }
+
+  /** Puts one round back into the active gun, or the primary if a knife is out. */
+  refundRound(): boolean {
+    const active = this.weapons[this.active];
+    const weapon = active.arch.fire === 'melee' ? this.weapons.primary : active;
+    if (weapon.arch.fire === 'melee') return false;
+    if (weapon.reloading > 0) return false;
+    if (weapon.mag < weapon.arch.magSize) weapon.mag += 1;
+    else weapon.reserve += 1;
+    return true;
   }
 
   hud(): HudModel {

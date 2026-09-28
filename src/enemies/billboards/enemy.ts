@@ -7,7 +7,8 @@ const ENEMY_HP = 36;
 export interface LiveEnemy {
   readonly mesh: THREE.Mesh;
   alive: boolean;
-  applyDamage(amount: number): void;
+  /** Returns true when this hit drops the imp. */
+  applyDamage(amount: number): boolean;
 }
 
 interface Gib {
@@ -46,12 +47,14 @@ class BillboardActor implements LiveEnemy {
     mesh.scale.setScalar(0.2);
   }
 
-  applyDamage(amount: number): void {
-    if (!this.alive) return;
+  applyDamage(amount: number): boolean {
+    if (!this.alive) return false;
     this.hp -= amount;
     this.flash = 0.08;
     this.material.color.setRGB(4, 3.2, 2.2);
-    if (this.hp <= 0) this.alive = false;
+    if (this.hp > 0) return false;
+    this.alive = false;
+    return true;
   }
 
   updateFlash(dt: number): void {

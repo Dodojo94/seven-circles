@@ -32,8 +32,11 @@ Reload frames = phase 2 (skipped for V0).
 
 - **Pivot:** **bottom-center** of each cell → `(160, 240)` in cell space
 - Sacred: pin that point to lower FOV (slightly right of screen center / lower third)
-- Cell contents already compose the weapon in the lower-right of the cell so the
-  silhouette reads like Doom weapon HUD when pivot-locked
+- **Aim lock:** muzzle / blade tip in cell near `~(112, 30)` / `~(100, 25–45)` (upper, slightly left of
+  center); grip near `~(230–260, 190–220)`. Steep up-left from grip → tip so that after
+  lower-right HUD placement the barrel/blade points at **screen-center crosshair**
+  (~480, 302 on 960×720), not a shallow left mid-screen aim.
+- Cell contents compose the weapon for Doom-style HUD when pivot-locked
 
 ## Suggested Three.js attach (Sacred later)
 

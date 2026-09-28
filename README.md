@@ -1,2 +1,39 @@
-# seven-circles
-Hell-descent billboard boomer shooter (Dante 7 floors) — Three.js; V0 one floor
+# Seven Circles
+
+Hell-descent **billboard-sprite boomer shooter** (Doom / CRUEL vibe, Dante’s Inferno–flavored). Built with **Vite + TypeScript + three.js** only — no React, no R3F, no Babylon.
+
+**V0** ships **one floor** for playtesting. Full game target: 7 descending floors, semi-random layouts, bosses, permadeath.
+
+## Play / Dev
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # tsc + vite build → dist/
+npm run preview  # serve production build
+```
+
+Click the canvas for pointer lock. **WASD** walk · **Space** jump · **C** crouch · **1 / 2 / 3** weapon slots (Primary / Secondary / Melee). No sprint, no slide.
+
+## Stack
+
+| Piece | Choice |
+|-------|--------|
+| Bundler | Vite |
+| Language | TypeScript |
+| 3D | three.js |
+| UI | DOM HUD (no React) |
+
+## Docs
+
+| File | Purpose |
+|------|---------|
+| [START.md](./START.md) | Clone, run, Windows notes, bot path |
+| [VISION.md](./VISION.md) | North star, product locks, V0 vs full |
+| [AGENTS.md](./AGENTS.md) | Roles, rooms, merge rules |
+| [FOLDERS.md](./FOLDERS.md) | Proposed `src/` layout |
+| [GROK_BUILD.md](./GROK_BUILD.md) | Standing rules for Grok Build agents |
+
+## License
+
+Private / TBD.

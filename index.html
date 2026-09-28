@@ -40,23 +40,55 @@
         padding: 6px 14px;
         border: 1px solid #8b4513;
         background: rgba(20, 8, 8, 0.7);
+        color: #e8c070;
+      }
+      #hud-weapons .slot.active {
+        border-color: #fff0c0;
+        color: #fff0c0;
+        background: rgba(60, 20, 10, 0.85);
+      }
+      #hud-ammo {
+        position: absolute;
+        bottom: 76px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 20px;
+        letter-spacing: 0.14em;
       }
       #hud-hint {
         position: absolute;
-        bottom: 72px;
+        bottom: 108px;
         left: 50%;
         transform: translateX(-50%);
         font-size: 12px;
         color: #a08060;
         opacity: 0.85;
       }
+      #crosshair {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 10px;
+        height: 10px;
+        transform: translate(-50%, -50%);
+      }
+      #crosshair::before,
+      #crosshair::after {
+        content: "";
+        position: absolute;
+        background: #e8c070;
+      }
+      #crosshair::before { left: 4px; top: 0; width: 2px; height: 10px; }
+      #crosshair::after { left: 0; top: 4px; width: 10px; height: 2px; }
     </style>
   </head>
   <body>
     <div id="app">
       <div id="hud">
+        <div id="crosshair"></div>
         <div id="hud-title">Seven Circles V0 — Floor 1</div>
-        <div id="hud-hint">Click to lock pointer · WASD walk · Space jump · Ctrl/C crouch · 1/2/3 labels only</div>
+        <div id="hud-hint">Click to aim · WASD · Space jump · Ctrl/C crouch · 1/2/3 swap · LMB fire · R reload</div>
+        <div id="hud-ammo"></div>
         <div id="hud-weapons">
           <div class="slot" id="slot-primary">[1] Primary</div>
           <div class="slot" id="slot-secondary">[2] Secondary</div>

@@ -1,11 +1,17 @@
 import * as THREE from 'three';
 import { boxFromCenter, type Aabb } from '../player/collision';
 
+export interface ArenaLevel {
+  colliders: Aabb[];
+  /** Geometry that blocks hitscan. The exit pad blocks shots but not walking. */
+  solids: THREE.Mesh[];
+}
+
 /**
  * Handcrafted Floor 1 test arena: dark floor, perimeter, and a few boxes.
- * No procgen. Returns solid AABBs for the FPS controller (exit pad is not solid).
+ * No procgen. Movement colliders skip the flat exit pad.
  */
-export function createArena(scene: THREE.Scene): Aabb[] {
+export function createArena(scene: THREE.Scene): ArenaLevel {
   const floorMat = new THREE.MeshStandardMaterial({
     color: 0x2a1010,
     roughness: 0.95,
@@ -47,6 +53,7 @@ export function createArena(scene: THREE.Scene): Aabb[] {
   ];
 
   const colliders: Aabb[] = [];
+  const solids: THREE.Mesh[] = [floor];
   for (const spec of wallSpecs) {
     const mesh = new THREE.Mesh(
       new THREE.BoxGeometry(spec.w, spec.h, spec.d),
@@ -54,6 +61,7 @@ export function createArena(scene: THREE.Scene): Aabb[] {
     );
     mesh.position.set(spec.x, spec.h / 2, spec.z);
     scene.add(mesh);
+    solids.push(mesh);
     colliders.push(boxFromCenter(spec.x, spec.z, spec.w, spec.h, spec.d));
   }
 
@@ -66,6 +74,7 @@ export function createArena(scene: THREE.Scene): Aabb[] {
   exit.position.set(0, 0.08, -14);
   exit.name = 'exit-stub';
   scene.add(exit);
+  solids.push(exit);
 
-  return colliders;
+  return { colliders, solids };
 }

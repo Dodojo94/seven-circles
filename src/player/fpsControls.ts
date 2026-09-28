@@ -57,9 +57,6 @@ export function createFpsControls(
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' || e.code === 'KeyC') e.preventDefault();
     keys.add(e.code);
-    if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') {
-      window.dispatchEvent(new CustomEvent('weapon-slot', { detail: e.code }));
-    }
   });
 
   window.addEventListener('keyup', (e) => {

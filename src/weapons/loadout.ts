@@ -62,18 +62,20 @@ export class Loadout {
     this.active = slot;
   }
 
-  requestReload(): void {
+  /** Starts a reload. False when melee, already reloading, full, or no reserve. */
+  requestReload(): boolean {
     const weapon = this.weapons[this.active];
-    if (weapon.arch.fire === 'melee') return;
-    if (weapon.reloading > 0) return;
-    if (weapon.reserve <= 0) return;
-    if (weapon.mag >= weapon.arch.magSize) return;
+    if (weapon.arch.fire === 'melee') return false;
+    if (weapon.reloading > 0) return false;
+    if (weapon.reserve <= 0) return false;
+    if (weapon.mag >= weapon.arch.magSize) return false;
     weapon.reloading = weapon.arch.reload;
+    return true;
   }
 
   /**
    * Consume a trigger pull. `held` is for full-auto; `edge` is a fresh click
-   * for shotgun and cleaver. Returns the hidden archetype when a shot fires.
+   * for the pistol and knife. Returns the hidden archetype when a shot fires.
    */
   pull(held: boolean, edge: boolean): WeaponArchetype | null {
     const weapon = this.weapons[this.active];

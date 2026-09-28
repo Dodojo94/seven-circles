@@ -11,6 +11,8 @@ const toEnemy = new THREE.Vector3();
 export interface RayHit {
   enemy: LiveEnemy | null;
   point: THREE.Vector3;
+  /** False when the ray died in the air — no impact spark. */
+  struck: boolean;
 }
 
 function aimDirection(camera: THREE.Camera, spread: number): THREE.Vector3 {
@@ -46,16 +48,17 @@ export function castPellet(
 
   if (enemyHit && enemyHit.distance <= solidDist && enemyHit.distance <= range) {
     const enemy = enemies.find((item) => item.mesh === enemyHit.object) ?? null;
-    return { enemy, point: enemyHit.point.clone() };
+    return { enemy, point: enemyHit.point.clone(), struck: true };
   }
 
   if (solidHit && solidHit.distance <= range) {
-    return { enemy: null, point: solidHit.point.clone() };
+    return { enemy: null, point: solidHit.point.clone(), struck: true };
   }
 
   return {
     enemy: null,
     point: camera.position.clone().addScaledVector(dir, range),
+    struck: false,
   };
 }
 

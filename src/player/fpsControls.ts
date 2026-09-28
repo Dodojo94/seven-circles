@@ -7,6 +7,8 @@ import { moveWithCollision, type Aabb } from './collision';
  */
 export interface FpsControls {
   update(dt: number): void;
+  /** Multiplier on mouse look. 1 is the default mid sensitivity. */
+  setLookScale(scale: number): void;
 }
 
 const WALK_SPEED = 6;
@@ -17,7 +19,7 @@ const STAND_EYE = 1.6;
 const CROUCH_EYE = 0.9;
 /** Extra height above the eyes so the head clips tall walls, not the camera point. */
 const HEAD_CLEARANCE = 0.2;
-const LOOK_SENS = 0.0022;
+const BASE_LOOK = 0.0022;
 
 export function createFpsControls(
   camera: THREE.PerspectiveCamera,
@@ -32,6 +34,7 @@ export function createFpsControls(
   let eye = STAND_EYE;
   let feetY = 0;
   let pointerLocked = false;
+  let lookScale = 1;
 
   const euler = new THREE.Euler(0, 0, 0, 'YXZ');
   const forward = new THREE.Vector3();
@@ -48,8 +51,9 @@ export function createFpsControls(
 
   document.addEventListener('mousemove', (e) => {
     if (!pointerLocked) return;
-    yaw -= e.movementX * LOOK_SENS;
-    pitch -= e.movementY * LOOK_SENS;
+    const sens = BASE_LOOK * lookScale;
+    yaw -= e.movementX * sens;
+    pitch -= e.movementY * sens;
     const limit = Math.PI / 2 - 0.01;
     pitch = Math.max(-limit, Math.min(limit, pitch));
   });
@@ -115,6 +119,9 @@ export function createFpsControls(
       camera.position.y = feetY + eye;
       euler.set(pitch, yaw, 0);
       camera.quaternion.setFromEuler(euler);
+    },
+    setLookScale(scale: number): void {
+      lookScale = Number.isFinite(scale) ? Math.min(3, Math.max(0.15, scale)) : 1;
     },
   };
 }

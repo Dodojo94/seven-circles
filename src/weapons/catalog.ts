@@ -1,6 +1,10 @@
 /**
  * Hidden weapon numbers. Gameplay code may read these.
  * The HUD must not: no damage, spread, range, or rate — name and ammo only.
+ *
+ * Feel targets (not shown): AK full-auto ~600 rpm, mild spread;
+ * Desert Eagle semi, one pellet, harder hit, tighter than the AK;
+ * knife is a short swing with no magazine.
  */
 export type WeaponSlot = 'primary' | 'secondary' | 'melee';
 
@@ -26,39 +30,39 @@ export interface WeaponArchetype {
 export const ARCHETYPES: readonly WeaponArchetype[] = [
   {
     slot: 'primary',
-    name: 'Hellbore',
+    name: 'AK-47',
     fire: 'auto',
-    damage: 11,
-    interval: 0.09,
+    damage: 13,
+    interval: 0.1,
     pellets: 1,
-    spread: 0.02,
-    range: 80,
+    spread: 0.03,
+    range: 90,
     magSize: 30,
     reserve: 90,
-    reload: 1.45,
+    reload: 2.4,
   },
   {
     slot: 'secondary',
-    name: 'Ash Scatter',
+    name: 'Desert Eagle',
     fire: 'semi',
-    damage: 8,
-    interval: 0.55,
-    pellets: 8,
-    spread: 0.28,
-    range: 18,
-    magSize: 6,
-    reserve: 24,
-    reload: 2.05,
+    damage: 40,
+    interval: 0.34,
+    pellets: 1,
+    spread: 0.008,
+    range: 75,
+    magSize: 7,
+    reserve: 35,
+    reload: 2.15,
   },
   {
     slot: 'melee',
-    name: 'Cleaver',
+    name: 'Knife',
     fire: 'melee',
-    damage: 48,
-    interval: 0.42,
+    damage: 55,
+    interval: 0.45,
     pellets: 1,
     spread: 0,
-    range: 2.5,
+    range: 2.15,
     magSize: 0,
     reserve: 0,
     reload: 0,

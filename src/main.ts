@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { castPellet, cleaveOverlap } from './combat/hitscan';
 import { createCombatFx } from './combat/fx';
+import { createSfx } from './combat/sfx';
 import { createEnemyWorld } from './enemies/billboards/enemy';
 import { createArena } from './floors/arena';
 import { createFpsControls } from './player/fpsControls';
 import { initHud } from './ui/hud';
+import { initAimSettings } from './ui/settings';
 import { bindWeaponInput } from './weapons/input';
 import { Loadout } from './weapons/loadout';
 
@@ -47,11 +49,16 @@ const spawns: Array<[number, number]> = [
 for (const [x, z] of spawns) enemies.spawn(x, 1.28, z);
 
 const controls = createFpsControls(camera, renderer.domElement, arena.colliders);
+initAimSettings(renderer.domElement, (scale) => controls.setLookScale(scale));
 const weapons = new Loadout();
 const weaponInput = bindWeaponInput(renderer.domElement);
 const hud = initHud();
 const fx = createCombatFx(scene, camera);
-const muzzle = new THREE.Vector3();
+const sfx = createSfx();
+const aim = new THREE.Vector3();
+
+renderer.domElement.addEventListener('pointerdown', () => sfx.unlock());
+window.addEventListener('keydown', () => sfx.unlock(), { once: true });
 
 const clock = new THREE.Clock();
 
@@ -63,26 +70,40 @@ function onResize(): void {
 window.addEventListener('resize', onResize);
 
 function fire(arch: NonNullable<ReturnType<Loadout['pull']>>): void {
+  sfx.fire(arch.slot);
   const melee = arch.fire === 'melee';
   if (melee) {
     const swing = cleaveOverlap(camera, arena.solids, enemies.alive(), arch.range, 0.62);
     for (const enemy of swing.enemies) enemy.applyDamage(arch.damage);
-    camera.getWorldDirection(muzzle);
-    const from = camera.position.clone().addScaledVector(muzzle, 0.4);
-    fx.shot(from, swing.point, true);
+    camera.getWorldDirection(aim);
+    const origin = camera.position.clone().addScaledVector(aim, 0.35);
+    fx.shot({
+      origin,
+      dir: aim.clone(),
+      impact: swing.enemies.length > 0 ? swing.point : null,
+      melee: true,
+      flesh: swing.enemies.length > 0,
+    });
     return;
   }
 
   const targets = enemies.alive();
-  camera.getWorldDirection(muzzle);
-  const from = camera.position.clone().addScaledVector(muzzle, 0.45);
   const impacts = [];
   for (let pellet = 0; pellet < arch.pellets; pellet += 1) {
     impacts.push(castPellet(camera, arena.solids, targets, arch.range, arch.spread));
   }
   for (const hit of impacts) {
     hit.enemy?.applyDamage(arch.damage);
-    fx.shot(from, hit.point, false);
+    aim.copy(hit.point).sub(camera.position);
+    if (aim.lengthSq() < 1e-6) camera.getWorldDirection(aim);
+    else aim.normalize();
+    fx.shot({
+      origin: camera.position.clone().addScaledVector(aim, 0.4),
+      dir: aim.clone(),
+      impact: hit.struck ? hit.point : null,
+      melee: false,
+      flesh: hit.enemy !== null,
+    });
   }
 }
 
@@ -94,7 +115,7 @@ function tick(): void {
   const locked = document.pointerLockElement === renderer.domElement;
   const input = weaponInput.read();
   if (input.slot) weapons.swap(input.slot);
-  if (input.reload) weapons.requestReload();
+  if (input.reload && weapons.requestReload()) sfx.reload();
   weapons.tick(dt);
   const shot = weapons.pull(locked && input.held, locked && input.edge);
   if (shot) fire(shot);

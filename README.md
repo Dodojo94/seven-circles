@@ -13,7 +13,7 @@ npm run build    # tsc + vite build → dist/
 npm run preview  # serve production build
 ```
 
-Click the canvas for pointer lock. **WASD** walk · **Space** jump · **C** crouch · **1 / 2 / 3** weapon slots (Primary / Secondary / Melee). No sprint, no slide.
+Click the canvas for pointer lock. **WASD** walk (one speed) · **Space** jump · **Ctrl** or **C** crouch · **1 / 2 / 3** swap Hellbore / Ash Scatter / Cleaver · **LMB** fire · **R** reload. Guns show ammo counts only — no damage or rate. Melee is infinite. No sprint, no slide. Walls block movement and shots.
 
 ## Stack
 

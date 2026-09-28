@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import { moveWithCollision, type Aabb } from './collision';
 
 /**
- * FPS camera stub.
- * Movement locks: single walk speed, crouch, jump — NO slide/sprint.
+ * Pointer-lock FPS controller.
+ * One walk speed, crouch (slower + lower camera), jump. No slide, no sprint.
  */
 export interface FpsControls {
   update(dt: number): void;
@@ -12,27 +13,33 @@ const WALK_SPEED = 6;
 const CROUCH_SPEED = 3;
 const JUMP_VELOCITY = 7;
 const GRAVITY = 22;
-const EYE_HEIGHT = 1.6;
-const CROUCH_HEIGHT = 0.9;
+const STAND_EYE = 1.6;
+const CROUCH_EYE = 0.9;
+/** Extra height above the eyes so the head clips tall walls, not the camera point. */
+const HEAD_CLEARANCE = 0.2;
+const LOOK_SENS = 0.0022;
 
 export function createFpsControls(
   camera: THREE.PerspectiveCamera,
   domElement: HTMLElement,
+  colliders: readonly Aabb[],
 ): FpsControls {
   const keys = new Set<string>();
   let yaw = 0;
   let pitch = 0;
   let velocityY = 0;
   let grounded = true;
-  let crouched = false;
+  let eye = STAND_EYE;
+  let feetY = 0;
   let pointerLocked = false;
 
   const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+  const forward = new THREE.Vector3();
+  const right = new THREE.Vector3();
+  const move = new THREE.Vector3();
 
   domElement.addEventListener('click', () => {
-    if (!pointerLocked) {
-      void domElement.requestPointerLock();
-    }
+    if (!pointerLocked) void domElement.requestPointerLock();
   });
 
   document.addEventListener('pointerlockchange', () => {
@@ -41,48 +48,59 @@ export function createFpsControls(
 
   document.addEventListener('mousemove', (e) => {
     if (!pointerLocked) return;
-    const sens = 0.0022;
-    yaw -= e.movementX * sens;
-    pitch -= e.movementY * sens;
-    pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, pitch));
+    yaw -= e.movementX * LOOK_SENS;
+    pitch -= e.movementY * LOOK_SENS;
+    const limit = Math.PI / 2 - 0.01;
+    pitch = Math.max(-limit, Math.min(limit, pitch));
   });
 
   window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' || e.code === 'KeyC') e.preventDefault();
     keys.add(e.code);
-    // Weapon slot stubs (1/2/3) — HUD highlights via custom event
     if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') {
-      window.dispatchEvent(
-        new CustomEvent('weapon-slot', { detail: e.code }),
-      );
+      window.dispatchEvent(new CustomEvent('weapon-slot', { detail: e.code }));
     }
   });
+
   window.addEventListener('keyup', (e) => {
     keys.delete(e.code);
   });
 
+  window.addEventListener('blur', () => {
+    keys.clear();
+  });
+
   return {
     update(dt: number): void {
-      crouched = keys.has('KeyC');
+      const crouched =
+        keys.has('KeyC') || keys.has('ControlLeft') || keys.has('ControlRight');
       const speed = crouched ? CROUCH_SPEED : WALK_SPEED;
-      const targetEye = crouched ? CROUCH_HEIGHT : EYE_HEIGHT;
+      const targetEye = crouched ? CROUCH_EYE : STAND_EYE;
+      eye += (targetEye - eye) * Math.min(1, 12 * dt);
 
-      const forward = new THREE.Vector3(
-        -Math.sin(yaw),
-        0,
-        -Math.cos(yaw),
-      );
-      const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-
-      const move = new THREE.Vector3();
+      forward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+      right.set(Math.cos(yaw), 0, -Math.sin(yaw));
+      move.set(0, 0, 0);
       if (keys.has('KeyW')) move.add(forward);
       if (keys.has('KeyS')) move.sub(forward);
       if (keys.has('KeyA')) move.sub(right);
       if (keys.has('KeyD')) move.add(right);
       if (move.lengthSq() > 0) {
         move.normalize().multiplyScalar(speed * dt);
-        camera.position.x += move.x;
-        camera.position.z += move.z;
       }
+
+      const headY = feetY + eye + HEAD_CLEARANCE;
+      const next = moveWithCollision(
+        camera.position.x,
+        camera.position.z,
+        move.x,
+        move.z,
+        feetY,
+        headY,
+        colliders,
+      );
+      camera.position.x = next.x;
+      camera.position.z = next.z;
 
       if (grounded && keys.has('Space')) {
         velocityY = JUMP_VELOCITY;
@@ -90,20 +108,14 @@ export function createFpsControls(
       }
 
       velocityY -= GRAVITY * dt;
-      camera.position.y += velocityY * dt;
-
-      const floorY = targetEye;
-      if (camera.position.y <= floorY) {
-        camera.position.y = floorY;
+      feetY += velocityY * dt;
+      if (feetY <= 0) {
+        feetY = 0;
         velocityY = 0;
         grounded = true;
       }
 
-      // Smooth crouch height when grounded
-      if (grounded) {
-        camera.position.y += (targetEye - camera.position.y) * Math.min(1, 12 * dt);
-      }
-
+      camera.position.y = feetY + eye;
       euler.set(pitch, yaw, 0);
       camera.quaternion.setFromEuler(euler);
     },

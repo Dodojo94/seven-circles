@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (default `http://localhost:5173`). Click the game view to capture the mouse.
+Open the URL Vite prints (default `http://localhost:5173`). Click the game view to capture the mouse. **WASD** walk · **Space** jump · **Ctrl** or **C** crouch. You cannot walk through the box walls.
 
 ### Scripts
 

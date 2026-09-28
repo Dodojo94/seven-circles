@@ -3,8 +3,9 @@ import { castPellet, cleaveOverlap } from './combat/hitscan';
 import { createCombatFx } from './combat/fx';
 import { createSfx } from './combat/sfx';
 import { createEnemyWorld, type LiveEnemy } from './enemies/billboards/enemy';
+import { QUAD_H } from './enemies/billboards/sheet';
 import { createArena } from './floors/arena';
-import { createPerkRun } from './perks/run';
+import { createWeaponPerks } from './perks/run';
 import { createFpsControls } from './player/fpsControls';
 import { initHud } from './ui/hud';
 import { initPerkHud } from './ui/perkHud';
@@ -48,7 +49,7 @@ const spawns: Array<[number, number]> = [
   [5.5, -8],
   [-8, 11],
 ];
-for (const [x, z] of spawns) enemies.spawn(x, 1.28, z);
+for (const [x, z] of spawns) enemies.spawn(x, QUAD_H / 2, z);
 
 const sfx = createSfx();
 const controls = createFpsControls(camera, renderer.domElement, arena.colliders, {
@@ -58,11 +59,17 @@ initAimSettings(renderer.domElement, (scale) => controls.setLookScale(scale));
 const weapons = new Loadout();
 const weaponInput = bindWeaponInput(renderer.domElement);
 const hud = initHud();
-const perks = createPerkRun();
-const perkHud = initPerkHud((index) => perks.choose(index));
+const perks = createWeaponPerks();
+const perkHud = initPerkHud();
 const fx = createCombatFx(scene, camera);
 const aim = new THREE.Vector3();
 const NEARBY_RANGE = 6;
+/** Hidden. A head-band hit deals this times gun damage. */
+const CRIT_MUL = 2;
+
+function syncPerks(): void {
+  perks.setEquipped(weapons.active, weapons.activePerks());
+}
 
 function perkContext(): { moving: boolean; nearby: number } {
   let nearby = 0;
@@ -71,13 +78,6 @@ function perkContext(): { moving: boolean; nearby: number } {
   }
   return { moving: controls.isMoving(), nearby };
 }
-
-function openLockout(): void {
-  controls.setInputEnabled(false);
-  if (document.pointerLockElement) document.exitPointerLock();
-}
-
-if (perks.isOffering()) openLockout();
 
 renderer.domElement.addEventListener('pointerdown', () => sfx.unlock());
 window.addEventListener('keydown', () => sfx.unlock(), { once: true });
@@ -91,26 +91,35 @@ function onResize(): void {
 }
 window.addEventListener('resize', onResize);
 
-function hurt(enemy: LiveEnemy, amount: number, melee: boolean, splash: boolean): void {
-  if (!enemy.applyDamage(amount)) return;
-  const result = perks.onKill({ melee, splash });
-  if (result.toast) perkHud.flash(result.toast);
-  if (result.refund) weapons.refundRound();
-  if (result.splash) {
-    const origin = enemy.mesh.position.clone();
-    for (const other of enemies.alive()) {
-      if (other.mesh.position.distanceTo(origin) > 3.2) continue;
-      hurt(other, perks.splashDamage(), false, true);
-      fx.shot({
-        origin,
-        dir: aim.clone().set(0, 1, 0),
-        impact: other.mesh.position.clone(),
-        melee: false,
-        flesh: true,
-      });
-    }
+function hurt(
+  enemy: LiveEnemy,
+  amount: number,
+  melee: boolean,
+  splash: boolean,
+  crit: boolean,
+): void {
+  if (!enemy.applyDamage(amount)) {
+    if (crit) perkHud.flash('CRIT');
+    return;
   }
-  if (perks.isOffering()) openLockout();
+  const result = perks.onKill({ melee, splash });
+  if (result.refund) weapons.refundRound();
+  const label =
+    crit && result.toast ? `CRIT · ${result.toast}` : crit ? 'CRIT' : result.toast;
+  if (label) perkHud.flash(label);
+  if (!result.splash) return;
+  const origin = enemy.mesh.position.clone();
+  for (const other of enemies.alive()) {
+    if (other.mesh.position.distanceTo(origin) > 3.2) continue;
+    hurt(other, perks.splashDamage(), false, true, false);
+    fx.shot({
+      origin,
+      dir: aim.clone().set(0, 1, 0),
+      impact: other.mesh.position.clone(),
+      melee: false,
+      flesh: true,
+    });
+  }
 }
 
 function fire(arch: NonNullable<ReturnType<Loadout['pull']>>): void {
@@ -120,7 +129,7 @@ function fire(arch: NonNullable<ReturnType<Loadout['pull']>>): void {
   const amount = arch.damage * (melee ? mods.meleeDamage : mods.gunDamage);
   if (melee) {
     const swing = cleaveOverlap(camera, arena.solids, enemies.alive(), arch.range, 0.62);
-    for (const enemy of swing.enemies) hurt(enemy, amount, true, false);
+    for (const enemy of swing.enemies) hurt(enemy, amount, true, false, false);
     camera.getWorldDirection(aim);
     const origin = camera.position.clone().addScaledVector(aim, 0.35);
     fx.shot({
@@ -143,8 +152,12 @@ function fire(arch: NonNullable<ReturnType<Loadout['pull']>>): void {
   for (const hit of impacts) {
     if (hit.enemy) {
       const wasAlive = hit.enemy.alive;
-      hurt(hit.enemy, amount, false, false);
-      if (wasAlive && perks.onGunHit() && weapons.refundRound()) perkHud.flash('Fourth Time');
+      const crit = wasAlive && hit.enemy.isHeadshot(hit.point);
+      const hitAmount = amount * (crit ? CRIT_MUL : 1);
+      hurt(hit.enemy, hitAmount, false, false, crit);
+      if (wasAlive && perks.onGunHit() && weapons.refundRound() && !crit) {
+        perkHud.flash('Fourth Time');
+      }
     }
     aim.copy(hit.point).sub(camera.position);
     if (aim.lengthSq() < 1e-6) camera.getWorldDirection(aim);
@@ -162,22 +175,10 @@ function fire(arch: NonNullable<ReturnType<Loadout['pull']>>): void {
 function tick(): void {
   const dt = Math.min(clock.getDelta(), 0.05);
   perks.tick(dt);
+  syncPerks();
   const ctx = perkContext();
   const mods = perks.modifiers(ctx);
 
-  if (perks.isOffering()) {
-    weaponInput.read();
-    openLockout();
-    enemies.update(dt, camera);
-    fx.update(dt);
-    hud.sync(weapons.hud());
-    perkHud.sync(perks.views(ctx), perks.offer());
-    renderer.render(scene, camera);
-    requestAnimationFrame(tick);
-    return;
-  }
-
-  controls.setInputEnabled(true);
   controls.setPerkMove(mods.walk, mods.dashCooldown);
   controls.update(dt);
   scene.updateMatrixWorld(true);
@@ -185,18 +186,21 @@ function tick(): void {
   const locked = document.pointerLockElement === renderer.domElement;
   const input = weaponInput.read();
   if (input.slot) weapons.swap(input.slot);
-  if (input.reload && weapons.requestReload(mods.reload)) sfx.reload();
+  syncPerks();
+  const equipped = perks.modifiers(perkContext());
+  if (input.reload && weapons.requestReload(equipped.reload)) sfx.reload();
   if (weapons.tick(dt)) {
     const toast = perks.onReloadComplete();
     if (toast) perkHud.flash(toast);
   }
-  const shot = weapons.pull(locked && input.held, locked && input.edge, mods.interval);
+  const shot = weapons.pull(locked && input.held, locked && input.edge, equipped.interval);
   if (shot) fire(shot);
 
   enemies.update(dt, camera);
   fx.update(dt);
   hud.sync(weapons.hud());
-  perkHud.sync(perks.views(perkContext()), perks.offer());
+  syncPerks();
+  perkHud.sync(perks.views(perkContext()));
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }

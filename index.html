@@ -125,36 +125,7 @@
       #perk-list .perk-name { color: #e8c070; }
       #perk-list .perk.hot .perk-name { color: #fff6d0; }
       #perk-list .perk-desc { color: #a08060; font-size: 11px; }
-      #perk-offer[hidden],
       #perk-toast[hidden] { display: none; }
-      #perk-offer {
-        pointer-events: auto;
-        position: absolute;
-        left: 50%;
-        top: 46%;
-        transform: translate(-50%, -50%);
-        z-index: 20;
-        text-align: center;
-      }
-      #perk-offer-title {
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        margin-bottom: 14px;
-      }
-      #perk-cards { display: flex; gap: 12px; justify-content: center; }
-      .perk-card {
-        width: 210px;
-        text-align: left;
-        font: inherit;
-        color: #e8c070;
-        background: rgba(12, 6, 6, 0.94);
-        border: 1px solid #8b4513;
-        padding: 12px;
-        cursor: pointer;
-      }
-      .perk-card .perk-key { color: #fff0c0; margin-bottom: 6px; }
-      .perk-card .perk-desc { color: #a08060; font-size: 12px; margin-top: 6px; }
-      #perk-offer-hint { margin-top: 12px; color: #a08060; font-size: 12px; }
       #perk-toast {
         position: absolute;
         left: 50%;
@@ -178,11 +149,6 @@
           <div class="slot" id="slot-primary">[1] Primary</div>
           <div class="slot" id="slot-secondary">[2] Secondary</div>
           <div class="slot" id="slot-melee">[3] Melee</div>
-        </div>
-        <div id="perk-offer" hidden>
-          <div id="perk-offer-title">Choose a perk</div>
-          <div id="perk-cards"></div>
-          <div id="perk-offer-hint">Click a card or press 1 / 2 / 3. Then click the view to aim.</div>
         </div>
         <div id="perk-list"></div>
         <div id="perk-toast" hidden></div>

@@ -1,4 +1,5 @@
-import { ARCHETYPES, type WeaponArchetype, type WeaponSlot } from './catalog';
+import { rollWeapon } from './roll';
+import type { WeaponArchetype, WeaponSlot } from './catalog';
 
 export interface HudModel {
   active: WeaponSlot;
@@ -9,6 +10,7 @@ export interface HudModel {
 
 interface RuntimeWeapon {
   arch: WeaponArchetype;
+  perkIds: readonly string[];
   mag: number;
   reserve: number;
   cooldown: number;
@@ -22,14 +24,15 @@ export class Loadout {
   private readonly weapons: Record<WeaponSlot, RuntimeWeapon>;
   private readonly names: Record<WeaponSlot, string>;
 
-  constructor(archetypes: readonly WeaponArchetype[] = ARCHETYPES) {
+  constructor(random: () => number = Math.random) {
     const weapons = {} as Record<WeaponSlot, RuntimeWeapon>;
     const names = {} as Record<WeaponSlot, string>;
     for (const slot of SLOT_ORDER) {
-      const arch = archetypes.find((item) => item.slot === slot);
-      if (!arch) throw new Error(`missing archetype ${slot}`);
+      const rolled = rollWeapon(slot, random);
+      const arch = rolled.archetype;
       weapons[slot] = {
         arch,
+        perkIds: rolled.perkIds,
         mag: arch.fire === 'melee' ? 0 : arch.magSize,
         reserve: arch.fire === 'melee' ? 0 : arch.reserve,
         cooldown: 0,
@@ -39,6 +42,10 @@ export class Loadout {
     }
     this.weapons = weapons;
     this.names = names;
+  }
+
+  activePerks(): readonly string[] {
+    return this.weapons[this.active].perkIds;
   }
 
   /** Advances cooldowns and reloads. True when a reload just finished. */

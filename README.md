@@ -13,7 +13,7 @@ npm run build    # tsc + vite build → dist/
 npm run preview  # serve production build
 ```
 
-Click the canvas for pointer lock. **WASD** walk (one speed) · **Space** jump · **Ctrl** or **C** crouch · **Shift** dash (tap, look-relative, works in the air) · **1 / 2 / 3** swap AK-47 / Desert Eagle / Knife · **LMB** fire · **R** reload. Guns show ammo counts only — no damage or rate. Knife is infinite. A perk offer appears at the start and every few kills (names and one-line text only, three active max). **Esc** or the Aim button opens sensitivity (saved in the browser). No sprint-hold, no slide. Walls block movement and shots. Killed billboards respawn after 5 seconds.
+Click the canvas for pointer lock. **WASD** walk (one speed) · **Space** jump · **Ctrl** or **C** crouch · **Shift** dash (tap, look-relative, works in the air) · **1 / 2 / 3** swap AK-47 / Desert Eagle / Knife · **LMB** fire · **R** reload. Guns show ammo counts only — no damage or rate. Knife is infinite. Each gun spawns with 1–2 perks (name and one line on the left; swap weapons to read the others). A headshot flashes **CRIT**. **Esc** or the Aim button opens sensitivity (saved in the browser). No sprint-hold, no slide. Walls block movement and shots. Killed imps play a short death, then return after 5 seconds.
 
 ## Stack
 

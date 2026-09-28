@@ -61,5 +61,3 @@ export const PERK_POOL: readonly PerkDef[] = [
   },
 ];
 
-export const MAX_ACTIVE_PERKS = 3;
-export const KILLS_PER_OFFER = 3;

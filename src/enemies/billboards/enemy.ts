@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { createBillboardEnemy, faceBillboard } from './placeholder';
+import { createBillboardEnemy, faceBillboard, isHeadHeight, setImpFrame } from './placeholder';
+import { IMP_FRAME } from './sheet';
 
 /** Hidden. Not shown on the HUD. */
 const ENEMY_HP = 36;
@@ -9,6 +10,7 @@ export interface LiveEnemy {
   alive: boolean;
   /** Returns true when this hit drops the imp. */
   applyDamage(amount: number): boolean;
+  isHeadshot(point: THREE.Vector3): boolean;
 }
 
 interface Gib {
@@ -35,6 +37,10 @@ class BillboardActor implements LiveEnemy {
   private hp = ENEMY_HP;
   private flash = 0;
   private pop = POP_TIME;
+  private frame: number = IMP_FRAME.idle;
+  private deathT = 0;
+  /** True while death frames are still playing. */
+  dying = false;
   private readonly material: THREE.MeshBasicMaterial;
 
   constructor(mesh: THREE.Mesh) {
@@ -45,25 +51,46 @@ class BillboardActor implements LiveEnemy {
     }
     this.material = material;
     mesh.scale.setScalar(0.2);
+    this.show(IMP_FRAME.idle);
+  }
+
+  isHeadshot(point: THREE.Vector3): boolean {
+    return isHeadHeight(this.mesh, point.y);
   }
 
   applyDamage(amount: number): boolean {
     if (!this.alive) return false;
     this.hp -= amount;
-    this.flash = 0.08;
+    this.flash = 0.16;
     this.material.color.setRGB(4, 3.2, 2.2);
+    this.show(IMP_FRAME.hurt);
     if (this.hp > 0) return false;
     this.alive = false;
+    this.dying = true;
+    this.deathT = 0;
+    this.material.color.setRGB(1, 1, 1);
+    this.show(IMP_FRAME.death0);
     return true;
   }
 
-  updateFlash(dt: number): void {
-    if (!this.alive || this.flash <= 0) return;
-    this.flash -= dt;
-    if (this.flash <= 0) this.material.color.setRGB(1, 1, 1);
+  /** Advance the death strip. True when the last frame has finished. */
+  advanceDeath(dt: number): boolean {
+    this.deathT += dt;
+    const frame =
+      this.deathT < 0.12 ? IMP_FRAME.death0 : this.deathT < 0.24 ? IMP_FRAME.death1 : IMP_FRAME.death2;
+    this.show(frame);
+    return this.deathT >= 0.36;
   }
 
-  updatePop(dt: number): void {
+  updateAlive(dt: number): void {
+    if (this.flash > 0) {
+      this.flash -= dt;
+      if (this.flash <= 0) {
+        this.flash = 0;
+        this.material.color.setRGB(1, 1, 1);
+        this.show(IMP_FRAME.idle);
+      }
+    }
     if (this.pop <= 0) return;
     this.pop -= dt;
     const t = 1 - Math.max(this.pop, 0) / POP_TIME;
@@ -73,11 +100,20 @@ class BillboardActor implements LiveEnemy {
   respawn(x: number, y: number, z: number): void {
     this.hp = ENEMY_HP;
     this.alive = true;
+    this.dying = false;
+    this.deathT = 0;
     this.flash = 0;
     this.pop = POP_TIME;
     this.material.color.setRGB(1, 1, 1);
     this.mesh.position.set(x, y, z);
     this.mesh.scale.setScalar(0.2);
+    this.show(IMP_FRAME.idle);
+  }
+
+  private show(frame: number): void {
+    if (this.frame === frame) return;
+    this.frame = frame;
+    setImpFrame(this.mesh, frame);
   }
 }
 
@@ -129,19 +165,22 @@ export function createEnemyWorld(scene: THREE.Scene): EnemyWorld & {
       for (const slot of slots) {
         const actor = slot.actor;
         if (!actor.alive) {
-          if (slot.respawnAt === 0) {
-            burst(actor.mesh.position);
-            scene.remove(actor.mesh);
-            slot.respawnAt = now + RESPAWN_MS;
-          } else if (now >= slot.respawnAt) {
+          if (actor.dying) {
+            faceBillboard(actor.mesh, camera);
+            if (actor.advanceDeath(dt)) {
+              burst(actor.mesh.position);
+              scene.remove(actor.mesh);
+              actor.dying = false;
+              slot.respawnAt = now + RESPAWN_MS;
+            }
+          } else if (slot.respawnAt > 0 && now >= slot.respawnAt) {
             actor.respawn(slot.x, slot.y, slot.z);
             scene.add(actor.mesh);
             slot.respawnAt = 0;
           }
           continue;
         }
-        actor.updateFlash(dt);
-        actor.updatePop(dt);
+        actor.updateAlive(dt);
         faceBillboard(actor.mesh, camera);
       }
 

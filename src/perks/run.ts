@@ -1,4 +1,5 @@
-import { KILLS_PER_OFFER, MAX_ACTIVE_PERKS, PERK_POOL, type PerkDef } from './catalog';
+import { PERK_POOL } from './catalog';
+import type { WeaponSlot } from '../weapons/catalog';
 
 /** Hidden multipliers. Gameplay only — never render these. */
 export interface CombatMods {
@@ -46,174 +47,160 @@ const EMPTY_MODS: CombatMods = {
   dashCooldown: 1,
 };
 
-function shuffle(source: readonly PerkDef[], random: () => number): PerkDef[] {
-  const copy = source.slice();
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(random() * (i + 1));
-    const swap = copy[i];
-    const next = copy[j];
-    if (!swap || !next) continue;
-    copy[i] = next;
-    copy[j] = swap;
-  }
-  return copy;
+interface SlotBuff {
+  hitStreak: number;
+  lastKillAt: number;
+  outlawUntil: number;
+  frenzyUntil: number;
+  clipUntil: number;
+  pulse: Map<string, number>;
 }
 
-export interface PerkRun {
+function freshBuff(): SlotBuff {
+  return {
+    hitStreak: 0,
+    lastKillAt: -999,
+    outlawUntil: 0,
+    frenzyUntil: 0,
+    clipUntil: 0,
+    pulse: new Map(),
+  };
+}
+
+/**
+ * Perks on the equipped weapon only.
+ * Sword Logic is the exception: a knife that has it blesses guns after you swap.
+ */
+export interface WeaponPerks {
   tick(dt: number): void;
-  isOffering(): boolean;
-  offer(): readonly PerkDef[];
-  choose(index: number): void;
+  setEquipped(slot: WeaponSlot, perkIds: readonly string[]): void;
   modifiers(ctx: { moving: boolean; nearby: number }): CombatMods;
   onGunHit(): boolean;
   onKill(event: KillEvent): KillResult;
   onReloadComplete(): string | null;
   views(ctx: { moving: boolean; nearby: number }): PerkView[];
-  /** Hidden splash amount. Zero when this kill should not burst. */
   splashDamage(): number;
 }
 
-export function createPerkRun(random: () => number = Math.random): PerkRun {
-  const owned: PerkDef[] = [];
-  let offerCards: PerkDef[] = [];
-  let kills = 0;
+export function createWeaponPerks(): WeaponPerks {
+  const buffs: Record<WeaponSlot, SlotBuff> = {
+    primary: freshBuff(),
+    secondary: freshBuff(),
+    melee: freshBuff(),
+  };
+  let slot: WeaponSlot = 'primary';
+  let ids: readonly string[] = [];
   let now = 0;
-  let hitStreak = 0;
-  let lastKillAt = -999;
-  let outlawUntil = 0;
-  let frenzyUntil = 0;
   let swordUntil = 0;
-  let clipUntil = 0;
-  const pulse = new Map<string, number>();
 
-  function owns(id: string): boolean {
-    return owned.some((perk) => perk.id === id);
+  function has(id: string): boolean {
+    return ids.includes(id);
   }
 
-  function pulsePerk(id: string): void {
-    pulse.set(id, now + PULSE);
+  function buff(): SlotBuff {
+    return buffs[slot];
   }
-
-  function rollOffer(): void {
-    if (owned.length >= MAX_ACTIVE_PERKS) {
-      offerCards = [];
-      return;
-    }
-    const taken = new Set(owned.map((perk) => perk.id));
-    const fresh = shuffle(
-      PERK_POOL.filter((perk) => !taken.has(perk.id)),
-      random,
-    );
-    offerCards = fresh.slice(0, 3);
-  }
-
-  rollOffer();
 
   return {
     tick(dt: number): void {
       now += dt;
     },
 
-    isOffering(): boolean {
-      return offerCards.length > 0;
-    },
-
-    offer(): readonly PerkDef[] {
-      return offerCards;
-    },
-
-    choose(index: number): void {
-      const picked = offerCards[index];
-      if (!picked) return;
-      if (owned.some((perk) => perk.id === picked.id)) return;
-      owned.push(picked);
-      offerCards = [];
+    setEquipped(next: WeaponSlot, perkIds: readonly string[]): void {
+      slot = next;
+      ids = perkIds;
     },
 
     modifiers(ctx: { moving: boolean; nearby: number }): CombatMods {
       const mods = { ...EMPTY_MODS };
-      if (owns('outlaw') && now < outlawUntil) mods.reload *= 0.45;
-      if (owns('feeding-frenzy') && now < frenzyUntil) mods.interval *= 0.62;
-      if (owns('rangefinder') && !ctx.moving) mods.spread *= 0.4;
-      if (owns('lightweight')) {
+      const state = buff();
+      if (has('outlaw') && now < state.outlawUntil) mods.reload *= 0.45;
+      if (has('feeding-frenzy') && now < state.frenzyUntil) mods.interval *= 0.62;
+      if (has('rangefinder') && !ctx.moving) mods.spread *= 0.4;
+      if (has('lightweight')) {
         mods.walk *= 1.15;
         mods.dashCooldown *= 0.62;
       }
-      if (owns('surrounded') && ctx.nearby >= 2) {
+      if (has('surrounded') && ctx.nearby >= 2) {
         mods.gunDamage *= 1.4;
         mods.meleeDamage *= 1.4;
       }
-      if (owns('sword-logic') && now < swordUntil) mods.gunDamage *= 1.45;
-      if (owns('kill-clip') && now < clipUntil) mods.gunDamage *= 1.35;
+      if (now < swordUntil) mods.gunDamage *= 1.45;
+      if (has('kill-clip') && now < state.clipUntil) mods.gunDamage *= 1.35;
       return mods;
     },
 
     onGunHit(): boolean {
-      if (!owns('fourth-time')) return false;
-      hitStreak += 1;
-      if (hitStreak < 4) return false;
-      hitStreak = 0;
-      pulsePerk('fourth-time');
+      if (!has('fourth-time')) return false;
+      const state = buff();
+      state.hitStreak += 1;
+      if (state.hitStreak < 4) return false;
+      state.hitStreak = 0;
+      state.pulse.set('fourth-time', now + PULSE);
       return true;
     },
 
     onKill(event: KillEvent): KillResult {
       const result: KillResult = { splash: false, refund: false, toast: null };
-      kills += 1;
+      const state = buff();
 
-      if (!event.splash && owns('feeding-frenzy')) {
-        if (now - lastKillAt <= FRENZY_GAP) {
-          frenzyUntil = now + FRENZY_TIME;
+      if (!event.splash && has('feeding-frenzy')) {
+        if (now - state.lastKillAt <= FRENZY_GAP) {
+          state.frenzyUntil = now + FRENZY_TIME;
           result.toast = 'Feeding Frenzy';
-          pulsePerk('feeding-frenzy');
+          state.pulse.set('feeding-frenzy', now + PULSE);
         }
       }
-      lastKillAt = now;
+      state.lastKillAt = now;
 
-      if (!event.splash && !event.melee && owns('outlaw')) {
-        outlawUntil = now + OUTLAW_TIME;
+      if (!event.splash && !event.melee && has('outlaw')) {
+        state.outlawUntil = now + OUTLAW_TIME;
         result.toast = 'Outlaw';
-        pulsePerk('outlaw');
+        state.pulse.set('outlaw', now + PULSE);
       }
-      if (!event.splash && event.melee && owns('sword-logic')) {
+      if (!event.splash && event.melee && has('sword-logic')) {
         swordUntil = now + SWORD_TIME;
         result.toast = 'Sword Logic';
-        pulsePerk('sword-logic');
+        state.pulse.set('sword-logic', now + PULSE);
       }
-      if (!event.splash && owns('subsistence')) {
+      if (!event.splash && has('subsistence')) {
         result.refund = true;
-        pulsePerk('subsistence');
+        state.pulse.set('subsistence', now + PULSE);
       }
-      if (!event.splash && owns('dragonfly')) {
+      if (!event.splash && has('dragonfly')) {
         result.splash = true;
         result.toast = result.toast ?? 'Dragonfly';
-        pulsePerk('dragonfly');
+        state.pulse.set('dragonfly', now + PULSE);
       }
-
-      if (owned.length < MAX_ACTIVE_PERKS && kills % KILLS_PER_OFFER === 0) rollOffer();
       return result;
     },
 
     onReloadComplete(): string | null {
-      if (!owns('kill-clip')) return null;
-      clipUntil = now + CLIP_TIME;
-      pulsePerk('kill-clip');
+      if (!has('kill-clip')) return null;
+      const state = buff();
+      state.clipUntil = now + CLIP_TIME;
+      state.pulse.set('kill-clip', now + PULSE);
       return 'Kill Clip';
     },
 
     views(ctx: { moving: boolean; nearby: number }): PerkView[] {
-      return owned.map((perk) => {
-        const until = pulse.get(perk.id) ?? 0;
+      const state = buff();
+      const views: PerkView[] = [];
+      for (const id of ids) {
+        const perk = PERK_POOL.find((item) => item.id === id);
+        if (!perk) continue;
+        const until = state.pulse.get(id) ?? 0;
         let hot = now < until;
-        if (perk.id === 'outlaw' && now < outlawUntil) hot = true;
-        if (perk.id === 'feeding-frenzy' && now < frenzyUntil) hot = true;
-        if (perk.id === 'sword-logic' && now < swordUntil) hot = true;
-        if (perk.id === 'kill-clip' && now < clipUntil) hot = true;
-        if (perk.id === 'lightweight') hot = true;
-        if (perk.id === 'rangefinder' && !ctx.moving) hot = true;
-        if (perk.id === 'surrounded' && ctx.nearby >= 2) hot = true;
-        return { name: perk.name, description: perk.description, hot };
-      });
+        if (id === 'outlaw' && now < state.outlawUntil) hot = true;
+        if (id === 'feeding-frenzy' && now < state.frenzyUntil) hot = true;
+        if (id === 'sword-logic' && now < swordUntil) hot = true;
+        if (id === 'kill-clip' && now < state.clipUntil) hot = true;
+        if (id === 'lightweight') hot = true;
+        if (id === 'rangefinder' && !ctx.moving) hot = true;
+        if (id === 'surrounded' && ctx.nearby >= 2) hot = true;
+        views.push({ name: perk.name, description: perk.description, hot });
+      }
+      return views;
     },
 
     splashDamage(): number {

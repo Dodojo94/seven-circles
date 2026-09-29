@@ -13,6 +13,7 @@ import { initPerkHud } from './ui/perkHud';
 import { initMinimap } from './ui/minimap';
 import { initAimSettings } from './ui/settings';
 import { bindWeaponInput } from './weapons/input';
+import { createWeaponView } from './weapons/viewSprite';
 import { Loadout } from './weapons/loadout';
 
 const app = document.getElementById('app');
@@ -69,6 +70,7 @@ const perks = createWeaponPerks();
 const perkHud = initPerkHud();
 const minimap = initMinimap();
 const fx = createCombatFx(scene, camera);
+const view = createWeaponView(camera);
 const aim = new THREE.Vector3();
 const NEARBY_RANGE = 6;
 /** Hidden. A head-band hit deals this times gun damage. */
@@ -130,6 +132,7 @@ function hurt(
 }
 
 function fire(arch: NonNullable<ReturnType<Loadout['pull']>>): void {
+  view.kick();
   const mods = perks.modifiers(perkContext());
   sfx.fire(arch.slot);
   const melee = arch.fire === 'melee';
@@ -194,6 +197,7 @@ function tick(): void {
   const input = weaponInput.read();
   if (input.slot) weapons.swap(input.slot);
   syncPerks();
+  view.setSlot(weapons.active);
   const equipped = perks.modifiers(perkContext());
   if (input.reload && weapons.requestReload(equipped.reload)) sfx.reload();
   if (weapons.tick(dt)) {
@@ -202,6 +206,7 @@ function tick(): void {
   }
   const shot = weapons.pull(locked && input.held, locked && input.edge, equipped.interval);
   if (shot) fire(shot);
+  view.update(dt);
 
   enemies.update(dt, camera);
   fx.update(dt);

@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { moveBody, type Aabb } from './collision';
+import { MOVE_TUNE, accelerate, applyFriction, softCap } from './moveTune';
 
 /**
  * Pointer-lock FPS controller.
- * Walk, crouch, jump, and a Shift dash. No slide, no sprint-hold, no double jump.
+ * Walk, crouch, jump, Shift dash, plus air-strafe and bunnyhop.
+ * No slide, no sprint-hold, no double jump.
  */
 export interface FpsControls {
   update(dt: number): void;
@@ -34,6 +36,7 @@ const BASE_FOV = 75;
 const DASH_SPEED = 22;
 const DASH_TIME = 0.18;
 const DASH_COOLDOWN = 0.8;
+const JUMP_BUFFER = MOVE_TUNE.jumpBufferMs / 1000;
 
 export function createFpsControls(
   camera: THREE.PerspectiveCamera,
@@ -45,6 +48,8 @@ export function createFpsControls(
   let yaw = 0;
   let pitch = 0;
   let velocityY = 0;
+  let velX = 0;
+  let velZ = 0;
   let grounded = true;
   let eye = STAND_EYE;
   let feetY = 0;
@@ -52,6 +57,7 @@ export function createFpsControls(
   let lookScale = 1;
   let dashTime = 0;
   let dashCooldown = 0;
+  let jumpBuffer = 0;
   let fovKick = 0;
   let walkMul = 1;
   let dashCooldownMul = 1;
@@ -115,7 +121,10 @@ export function createFpsControls(
   }
 
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' || e.code === 'KeyC') e.preventDefault();
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (!e.repeat) jumpBuffer = JUMP_BUFFER;
+    } else if (e.code === 'KeyC') e.preventDefault();
     if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
       if (!e.repeat) tryDash();
       return;
@@ -143,12 +152,26 @@ export function createFpsControls(
       let dx = 0;
       let dy = 0;
       let dz = 0;
+      jumpBuffer = Math.max(0, jumpBuffer - dt);
+
+      forward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+      right.set(Math.cos(yaw), 0, -Math.sin(yaw));
+      move.set(0, 0, 0);
+      if (keys.has('KeyW')) move.add(forward);
+      if (keys.has('KeyS')) move.sub(forward);
+      if (keys.has('KeyA')) move.sub(right);
+      if (keys.has('KeyD')) move.add(right);
+      const wishLen = Math.hypot(move.x, move.z);
+      const wishX = wishLen > 1e-6 ? move.x / wishLen : 0;
+      const wishZ = wishLen > 1e-6 ? move.z / wishLen : 0;
 
       if (dashTime > 0) {
         const step = Math.min(dt, dashTime);
-        dx = dashDir.x * DASH_SPEED * step;
+        velX = dashDir.x * DASH_SPEED;
+        velZ = dashDir.z * DASH_SPEED;
+        dx = velX * step;
         dy = dashDir.y * DASH_SPEED * step;
-        dz = dashDir.z * DASH_SPEED * step;
+        dz = velZ * step;
         dashTime -= dt;
         if (dashTime <= 0) {
           dashTime = 0;
@@ -157,31 +180,68 @@ export function createFpsControls(
         }
       } else {
         dashCooldown = Math.max(0, dashCooldown - dt);
-        forward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
-        right.set(Math.cos(yaw), 0, -Math.sin(yaw));
-        move.set(0, 0, 0);
-        if (keys.has('KeyW')) move.add(forward);
-        if (keys.has('KeyS')) move.sub(forward);
-        if (keys.has('KeyA')) move.sub(right);
-        if (keys.has('KeyD')) move.add(right);
-        if (move.lengthSq() > 0) {
-          move.normalize().multiplyScalar(speed * dt);
-          dx = move.x;
-          dz = move.z;
-        }
-
-        if (grounded && keys.has('Space')) {
+        const hop = grounded && (keys.has('Space') || jumpBuffer > 0);
+        if (hop) {
+          velX *= MOVE_TUNE.hopRetain;
+          velZ *= MOVE_TUNE.hopRetain;
           velocityY = JUMP_VELOCITY;
           grounded = false;
+          jumpBuffer = 0;
         }
+        if (grounded) {
+          const slowed = applyFriction(
+            { vx: velX, vz: velZ },
+            MOVE_TUNE.groundFriction,
+            MOVE_TUNE.stopSpeed,
+            dt,
+          );
+          const stepped = accelerate(
+            slowed,
+            wishX,
+            wishZ,
+            wishLen > 0 ? speed : 0,
+            MOVE_TUNE.groundAccelerate,
+            dt,
+            Number.POSITIVE_INFINITY,
+          );
+          velX = stepped.vx;
+          velZ = stepped.vz;
+        } else if (wishLen > 0) {
+          const stepped = accelerate(
+            { vx: velX, vz: velZ },
+            wishX,
+            wishZ,
+            speed,
+            MOVE_TUNE.airAccelerate,
+            dt,
+            MOVE_TUNE.airWishCap,
+          );
+          const capped = softCap(stepped, MOVE_TUNE.maxAirSpeed, MOVE_TUNE.airBleed, dt);
+          velX = capped.vx;
+          velZ = capped.vz;
+        } else {
+          const capped = softCap(
+            { vx: velX, vz: velZ },
+            MOVE_TUNE.maxAirSpeed,
+            MOVE_TUNE.airBleed,
+            dt,
+          );
+          velX = capped.vx;
+          velZ = capped.vz;
+        }
+
         velocityY -= GRAVITY * dt;
+        dx = velX * dt;
         dy = velocityY * dt;
+        dz = velZ * dt;
       }
 
       const bodyHeight = eye + HEAD_CLEARANCE;
+      const startX = camera.position.x;
+      const startZ = camera.position.z;
       const next = moveBody(
-        camera.position.x,
-        camera.position.z,
+        startX,
+        startZ,
         feetY,
         dx,
         dy,
@@ -191,6 +251,12 @@ export function createFpsControls(
       );
       camera.position.x = next.x;
       camera.position.z = next.z;
+      if (dt > 0 && dashTime <= 0) {
+        const movedX = next.x - startX;
+        const movedZ = next.z - startZ;
+        if (Math.abs(movedX) + 1e-6 < Math.abs(dx)) velX = movedX / dt;
+        if (Math.abs(movedZ) + 1e-6 < Math.abs(dz)) velZ = movedZ / dt;
+      }
       feetY = next.feetY;
       if (next.grounded) {
         grounded = true;

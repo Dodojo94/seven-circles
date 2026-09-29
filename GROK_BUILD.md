@@ -19,7 +19,7 @@ For every Grok Build (and similar bot) task on this repo.
 | **Billboards** | Enemies = `THREE.Sprite` or camera-facing quads |
 | **Hidden stats** | Base gun stats stay hidden (CS feel) |
 | **Perks visible** | When perks exist, show perks — not raw DPS sheets |
-| **Movement** | Walk + crouch + jump only — **no slide, no sprint** |
+| **Movement** | Walk + crouch + jump + Shift dash + air-strafe / bhop — **no slide, no sprint-hold, no double jump** |
 | **Weapons** | Exactly 3 slots: Primary / Secondary / Melee; swap `1` / `2` / `3` |
 | **Stack** | Vite + TypeScript + three.js only — no React / R3F / Babylon |
 

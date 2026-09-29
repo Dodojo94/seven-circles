@@ -1,19 +1,29 @@
 import * as THREE from 'three';
+import { boxFromCenter, type Aabb } from '../player/collision';
+import { BLOCKS, EXIT_PAD, SHELL } from './layout';
 
-/** V0 test arena: flat floor + a few box walls. */
-export function createArena(scene: THREE.Scene): void {
+export interface ArenaLevel {
+  colliders: Aabb[];
+  /** Geometry that blocks hitscan. The exit pad blocks shots but not walking. */
+  solids: THREE.Mesh[];
+}
+
+/**
+ * Handcrafted Floor 1: one ~80×80 room, cover, and an exit pad.
+ * No procgen. The pad is not a movement collider.
+ */
+export function createArena(scene: THREE.Scene): ArenaLevel {
   const floorMat = new THREE.MeshStandardMaterial({
     color: 0x2a1010,
     roughness: 0.95,
     metalness: 0.05,
   });
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), floorMat);
+  const floorSize = (SHELL + 1) * 2;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(floorSize, floorSize), floorMat);
   floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
   scene.add(floor);
 
-  // Grid hint on floor
-  const grid = new THREE.GridHelper(40, 40, 0x4a1818, 0x2a0c0c);
+  const grid = new THREE.GridHelper(80, 40, 0x4a1818, 0x2a0c0c);
   grid.position.y = 0.01;
   scene.add(grid);
 
@@ -22,32 +32,35 @@ export function createArena(scene: THREE.Scene): void {
     roughness: 0.9,
     metalness: 0.1,
   });
+  const crateMat = new THREE.MeshStandardMaterial({
+    color: 0x4a2018,
+    roughness: 0.85,
+    metalness: 0.08,
+  });
 
-  const wallSpecs: Array<{ x: number; z: number; w: number; h: number; d: number }> = [
-    { x: 0, z: -12, w: 16, h: 4, d: 1 },
-    { x: -10, z: -4, w: 1, h: 4, d: 10 },
-    { x: 10, z: -4, w: 1, h: 4, d: 10 },
-    { x: -6, z: 6, w: 6, h: 3, d: 1 },
-    { x: 7, z: 2, w: 1, h: 3.5, d: 5 },
-  ];
-
-  for (const spec of wallSpecs) {
+  const colliders: Aabb[] = [];
+  const solids: THREE.Mesh[] = [floor];
+  for (const spec of BLOCKS) {
     const mesh = new THREE.Mesh(
       new THREE.BoxGeometry(spec.w, spec.h, spec.d),
-      wallMat,
+      spec.crate ? crateMat : wallMat,
     );
     mesh.position.set(spec.x, spec.h / 2, spec.z);
     scene.add(mesh);
+    solids.push(mesh);
+    colliders.push(boxFromCenter(spec.x, spec.z, spec.w, spec.h, spec.d));
   }
 
-  // Stub exit marker (run complete placeholder)
   const exitMat = new THREE.MeshStandardMaterial({
     color: 0x664400,
     emissive: 0x442200,
-    emissiveIntensity: 0.4,
+    emissiveIntensity: 0.55,
   });
-  const exit = new THREE.Mesh(new THREE.BoxGeometry(2, 0.15, 2), exitMat);
-  exit.position.set(0, 0.08, -14);
+  const exit = new THREE.Mesh(new THREE.BoxGeometry(EXIT_PAD.w, EXIT_PAD.h, EXIT_PAD.d), exitMat);
+  exit.position.set(EXIT_PAD.x, EXIT_PAD.h / 2, EXIT_PAD.z);
   exit.name = 'exit-stub';
   scene.add(exit);
+  solids.push(exit);
+
+  return { colliders, solids };
 }
